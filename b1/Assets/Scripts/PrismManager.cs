@@ -169,7 +169,7 @@ public class PrismManager : MonoBehaviour
                 int dot1 = (int)Vector2.Dot(c1, da1);
                 //away from C
                 if (dot1 > 0)// if same direction, make d opposite
-                    d.Negate();
+                    Negate(d);
             }
 
             //If the new vector (d) perpenicular on AB is in the same direction with the origin (A0)
@@ -192,7 +192,7 @@ public class PrismManager : MonoBehaviour
             //away form B
             int dot3 = (int)Vector2.Dot(b1, da);
             if (dot3 > 0) {
-                d.Negate();
+                Negate(d);
             }
 
             //If the new vector (d) perpenicular on AC edge, is in the same direction with the origin (A0)
@@ -222,41 +222,44 @@ public class PrismManager : MonoBehaviour
             Vector2 d = new Vector2(-ab.y, ab.x);
             int dot5 = (int)Vector2.Dot(ao, d);
             if (dot5 < 0) {
-                d.Negate();
+                Negate(d);
             }
-        } 
-            return false;
-            }
+        }
+        return false;
 
-    bool IsCollide(Prism a, Prism b) {
-        Vector2 d = new Vector2(1, -1);
-        Simplex.Add(d);
-        // negate d for the next point
-        d.Delete();
-        // start looping
-        while (true){
-            // add a new point to the simplex because we haven't terminated yet
-            Simplex.Add(support(a, b, d));
-            // make sure that the last point we added actually passed the origin
-            if (Simplex.Last().Dot(d) <= 0) {
-                // if the point added last was not past the origin in the direction of d
-                // then the Minkowski Sum cannot possibly contain the origin since
-                // the last point added is on the edge of the Minkowski Difference
-                return false;
-            }else{
-                if (containsOrigin(ref d)) {
-                    // if it does then we know there is a collision
-                    return true;
+
+        bool IsCollide(Prism a, Prism b) {
+            Vector2 last = Simplex[sizeOfList - 1];
+            Vector2 dark = new Vector2(1, -1);
+            Simplex.Add(dark);
+            // negate d for the next point
+            Negate(dark);
+            // start looping
+            while (true) {
+                // add a new point to the simplex because we haven't terminated yet
+                Simplex.Add(support(a, b, dark));
+                // make sure that the last point we added actually passed the origin
+                int dot6 = (int)Vector2.Dot(last, dark);
+                if (dot6 <= 0) {
+                    // if the point added last was not past the origin in the direction of d
+                    // then the Minkowski Sum cannot possibly contain the origin since
+                    // the last point added is on the edge of the Minkowski Difference
+                    return false;
+                } else {
+                    if (containsOrigin(ref dark)) {
+                        // if it does then we know there is a collision
+                        return true;
+                    }
                 }
             }
         }
+
     }
-        var prismA = collision.a;
-        var prismB = collision.b;
-        collision.penetrationDepthVectorAB = Vector3.zero;
-        return true;
-    }
-    
+    var prismA = collision.a;
+    var prismB = collision.b;
+    collision.penetrationDepthVectorAB = Vector3.zero;
+    return true;
+}
 
 
     #endregion
