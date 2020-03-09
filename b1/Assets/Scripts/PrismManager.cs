@@ -16,7 +16,7 @@ public class PrismManager : MonoBehaviour
     private List<Prism> prisms = new List<Prism>();
     private List<GameObject> prismObjects = new List<GameObject>();
     private GameObject prismParent;
-    private Dictionary<Prism,bool> prismColliding = new Dictionary<Prism, bool>();
+    private Dictionary<Prism, bool> prismColliding = new Dictionary<Prism, bool>();
 
     private const float UPDATE_RATE = 0.5f;
 
@@ -59,7 +59,7 @@ public class PrismManager : MonoBehaviour
 
         StartCoroutine(Run());
     }
-    
+
     void Update()
     {
         #region Visualization
@@ -122,21 +122,147 @@ public class PrismManager : MonoBehaviour
         yield break;
     }
 
-    private bool CheckCollision(PrismCollision collision)
-    {
-        var prismA = collision.a;
-        var prismB = collision.b;
+    private bool CheckCollision(PrismCollision collision) {
+        List<Vector2> Simplex = new List<Vector2>();
+        int sizeOfList = Simplex.Count;
+
+        Vector2 getFarthestPointInDirection(Vector2 d) {
+            int index = 0;
+            double maxDot = (int)Vector2.Dot(Simplex[index], d);
+            if (Simplex != null) {
+                for (int i = 1; i < sizeOfList; i++) {
+                    int dot = (int)Vector2.Dot(Simplex[i], d);
+                    if (dot > maxDot) {
+                        maxDot = dot;
+                        index = i;
+                    }
+                }
+            }
+            return Simplex[index];
+        }
+
+        Vector2 support(Prism a, Prism b, Vector2 d) {
+            // get points on the edge of the shapes in opposite directions
+            Vector2 p1 = a.getFarthestPointInDirection(d);
+            Vector2 p2 = b.getFarthestPointInDirection(new Vector2(-d.x, -d.y));
+
+            // Minkowski Difference
+            Vector2 p3 = new Vector2((p1 - p2).x, (p1 - p2).y);
+
+            // p3 is now a point in Minkowski space on the edge of the Minkowski Difference
+            return p3;
+        }
+
+        bool containsOrigin(ref Vector2 d) {
+            // get the last point added to the simplex
+            Vector2 a = Simplex[sizeOfList - 1];
+            // compute AO (same thing as -A)
+            Vector2 ao = new Vector2(-a.x, -a.y);
+
+            //triangle  ABC
+            if (Simplex.Count() == 3) {
+                Vector2 b2 = Simplex[1];
+                Vector2 c1 = Simplex[0];
+                Vector2 ab1 = b2 - a;
+                Vector2 ac = c1 - a;
+                Vector2 da1 = new Vector2(-ab1.y, ab1.x);
+                int dot1 = (int)Vector2.Dot(c1, da1);
+                //away from C
+                if (dot1 > 0)// if same direction, make d opposite
+                    d.Negate();
+            }
+
+            //If the new vector (d) perpenicular on AB is in the same direction with the origin (A0)
+            //it means that C is the furthest from origin and remove to create a new simplex
+            Vector2 b = Simplex[1];
+            Vector2 c = Simplex[0];
+            Vector2 ab = b - a;
+            Vector2 da = new Vector2(-ab.y, ab.x);
+            int dot2 = (int)Vector2.Dot(ao, da);
+            if (dot2 > 0) {//same direction
+
+                Simplex.Remove(c);
+                return false;
+            }
+
+            //direction to be perpendicular to AC
+            Vector2 ac1 = c - a;
+            da = new Vector2(-ac1.y, ac1.x);
+            Vector2 b1 = Simplex[1];
+            //away form B
+            int dot3 = (int)Vector2.Dot(b1, da);
+            if (dot3 > 0) {
+                d.Negate();
+            }
+
+            //If the new vector (d) perpenicular on AC edge, is in the same direction with the origin (A0)
+            //it means that B is the furthest from origin and remove to create a new simplex
+
+
+            int dot4 = (int)Vector2.Dot(ao, da);
+            if (dot4 > 0) {
+                Simplex.Remove(b1);
+                return false;
+
+
+                //origin must be inside the triangle, so this is the simplex
+            }
+            return true;
+        }
 
         
-        collision.penetrationDepthVectorAB = Vector3.zero;
+        else{
+            Vector2 a = Simplex[sizeOfList - 1];
+            // then its the line segment case
+            Vector2 b = Simplex[0];
+            // compute AB
+            Vector2 ab = b - a;
+            //direction perpendicular to ab, to orgin: ABXAOXAB
+            Vector2 ao = new Vector2(-a.x, -a.y);
+            Vector2 d = new Vector2(-ab.y, ab.x);
+            int dot5 = (int)Vector2.Dot(ao, d);
+            if (dot5 < 0) {
+                d.Negate();
+            }
+        } 
+            return false;
+            }
 
+    bool IsCollide(Prism a, Prism b) {
+        Vector2 d = new Vector2(1, -1);
+        Simplex.Add(d);
+        // negate d for the next point
+        d.Delete();
+        // start looping
+        while (true){
+            // add a new point to the simplex because we haven't terminated yet
+            Simplex.Add(support(a, b, d));
+            // make sure that the last point we added actually passed the origin
+            if (Simplex.Last().Dot(d) <= 0) {
+                // if the point added last was not past the origin in the direction of d
+                // then the Minkowski Sum cannot possibly contain the origin since
+                // the last point added is on the edge of the Minkowski Difference
+                return false;
+            }else{
+                if (containsOrigin(ref d)) {
+                    // if it does then we know there is a collision
+                    return true;
+                }
+            }
+        }
+    }
+        var prismA = collision.a;
+        var prismB = collision.b;
+        collision.penetrationDepthVectorAB = Vector3.zero;
         return true;
     }
     
+
+
     #endregion
 
     #region Private Functions
-    
+
     private void ResolveCollision(PrismCollision collision)
     {
         var prismObjA = collision.a.prismObject;
@@ -222,6 +348,5 @@ public class PrismManager : MonoBehaviour
             Item2 = v;
         }
     }
-
     #endregion
 }
